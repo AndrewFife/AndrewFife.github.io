@@ -6,7 +6,7 @@
     <title>Iframe Embed</title>
 </head>
 <body>
-    <h1> Test File Iframe - v1.14</h1>
+    <h1> Test File Iframe - v1.15</h1>
 
     <iframe id="submissionIframe" frameborder="0" style="width: 100%; height: 600px;"></iframe>
     <script>
@@ -16,8 +16,6 @@
       function getSubmissionIdFromUrl() {
   
         var urlParams = new URLSearchParams(window.location.search);
-
-        alert(urlParams);
         
   
         return urlParams.get('submissionid');
@@ -35,8 +33,12 @@
         if (submissionId) {
   
           var iframe = document.getElementById('submissionIframe');
+
+          alert(iframe);
   
           var editLink = 'https://venpulse.jotform.com/edit' + submissionId;
+
+          alert(editLink);
   
           iframe.src = editLink;
   
