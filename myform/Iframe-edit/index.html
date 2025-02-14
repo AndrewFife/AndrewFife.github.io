@@ -8,26 +8,34 @@
 <body>
     <h1> Test File Iframe - v1.19</h1>
 
-    <iframe id="submissionIframe" 
-      
+    
+    
+    <iframe
+      id="submissionIframe" 
       title="Edit of Fuel Purchase Form"
       onload="window.parent.scrollTo(0,0)"
       allowtransparency="true"
-      allow="geolocation; microphone; camera; fullscreen"
-      
+      allow="geolocation; microphone; camera; fullscreen"    
       frameborder="0"
       style="min-width:100%;max-width:100%;height:539px;border:none;"
       scrolling="no">
     </iframe>
-    <script>
+   
+
+      
+      
+      <script>
+      // Scripts for emebeding Jotform
+      src='https://venpulse.jotform.com/s/umd/latest/for-form-embed-handler.js'></script>
+      <script>window.jotformEmbedHandler("iframe[id='submissionIframe']", "https://venpulse.jotform.com/")</script>
   
+      <script>
       // Function to extract submission ID from URL parameters
   
       function getSubmissionIdFromUrl() {
   
         var urlParams = new URLSearchParams(window.location.search);
         
-  
         return urlParams.get('submissionid');
   
       }
@@ -42,13 +50,10 @@
   
         if (submissionId) {
   
-          var iframe = document.getElementById('submissionIframe');
-
-          
+          var iframe = document.getElementById('submissionIframe');         
   
           var editLink = 'https://venpulse.jotform.com/edit/' + submissionId;
-
-  
+ 
           iframe.src = editLink;
   
         } else {
@@ -64,8 +69,7 @@
       loadSubmissionEditLink();
   
     </script>
-    <script src='https://venpulse.jotform.com/s/umd/latest/for-form-embed-handler.js'></script>
-    <script>window.jotformEmbedHandler("iframe[id='submissionIframe']", "https://venpulse.jotform.com/")</script>
+    
     
     </body>
 </html>
