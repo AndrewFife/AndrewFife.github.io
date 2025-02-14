@@ -6,7 +6,14 @@
     <title>Iframe Embed - Edit link</title>
 </head>
 <body>
-    <h1> Test File Iframe - v1.21</h1>
+    <h1> Test File Iframe - Edit Link - v1.22</h1>
+
+    <!-- 
+    
+    Iframe within which the edit link is embeded. Properties copied from 
+    normal embed script . Change id and remove source.
+     
+    -->
 
     <iframe
       id="submissionIframe" 
@@ -26,7 +33,6 @@
   
         var urlParams = new URLSearchParams(window.location.search);
         
-  
         return urlParams.get('submissionid');
   
       }
@@ -35,18 +41,12 @@
   
       function loadSubmissionEditLink() {
   
-        var submissionId = getSubmissionIdFromUrl();
-
-      
+        var submissionId = getSubmissionIdFromUrl();    
   
         if (submissionId) {
   
-          var iframe = document.getElementById('submissionIframe');
-
-          
-  
+          var iframe = document.getElementById('submissionIframe');      
           var editLink = 'https://venpulse.jotform.com/edit/' + submissionId;
-
   
           iframe.src = editLink;
   
@@ -63,6 +63,8 @@
       loadSubmissionEditLink();
   
     </script>
+
+     <!-- Include Jotform Emedded Form Scripts -->
     <script src='https://venpulse.jotform.com/s/umd/latest/for-form-embed-handler.js'></script>
     <script>window.jotformEmbedHandler("iframe[id='submissionIframe']", "https://venpulse.jotform.com/")</script>
     
