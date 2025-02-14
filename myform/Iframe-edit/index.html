@@ -1,73 +1,77 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Iframe Embed - Edit link</title>
-</head>
-<body>
-    <h1> Test File Iframe - Edit Link - v1.26</h1>
 
-    <!-- 
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iframe Embed - Edit link</title>
+</head>
+
+<body>
+  <h1> Test File Iframe - Edit Link - v1.27</h1>
+
+  <!-- 
     
     Iframe within which the edit link is embeded. Properties copied from 
-    normal embed script . Change id and remove source.
+    normal embed script . Change id to submissionIframe .
      
     -->
 
-    <iframe
-      id="submissionIframe" 
-      title="Edit of Fuel Purchase Form"
-      onload="window.parent.scrollTo(0,0)"
-      allowtransparency="true"
-      src="https://e-demo.jotform.com/thankyou.html"
-      allow="geolocation; microphone; camera; fullscreen"    
-      frameborder="0"
-      style="min-width:100%;max-width:100%;height:539px;border:none;"
-      scrolling="no">
-    </iframe>
-    <script>
-  
-      // Function to extract submission ID from URL parameters
-  
-      function getSubmissionIdFromUrl() {
-  
-        var urlParams = new URLSearchParams(window.location.search);
-        
-        return urlParams.get('submissionid');
-  
-      }
-  
-      // Function to load submission edit link dynamically
-  
-      function loadSubmissionEditLink() {
-  
-        var submissionId = getSubmissionIdFromUrl();    
-  
-        if (submissionId) {
-  
-          var iframe = document.getElementById('submissionIframe');      
-          var editLink = 'https://e-demo.jotform.com/edit/' + submissionId;
-  
-          iframe.src = editLink;
-  
-        } else {
-  
-          console.error('Submission ID not found in URL parameters.');
-  
-        }
-  
-      }
-  
-      // Call the function to load the submission edit link
-  
-      loadSubmissionEditLink();
-  
-    </script>
+  <iframe 
+    id="submissionIframe" 
+    title="Embedded Edit Link Form" 
+    onload="window.parent.scrollTo(0,0)"
+    allowtransparency="true" 
+    allow="geolocation; microphone; camera; fullscreen"
+    src="https://e-demo.jotform.com/250443047249051" 
+    frameborder="0"
+    style="min-width:100%;max-width:100%;height:539px;border:none;" 
+    scrolling="no"> 
+  </iframe>
+ 
+  <script>
 
-     <!-- Include Jotform Emedded Form Scripts -->
-    <script src='https://e-demo.jotform.com/s/umd/latest/for-form-embed-handler.js'></script>
-    <script>window.jotformEmbedHandler("iframe[id='submissionIframe']", "https://e-demo.jotform.com/")</script>
-    
-    </body>
+    // Function to extract submission ID from URL parameters
+
+    function getSubmissionIdFromUrl() {
+
+      var urlParams = new URLSearchParams(window.location.search);
+
+      return urlParams.get('submissionid');
+
+    }
+
+    // Function to load submission edit link dynamically
+
+    function loadSubmissionEditLink() {
+
+      var submissionId = getSubmissionIdFromUrl();
+
+      if (submissionId) {
+
+        var iframe = document.getElementById('submissionIframe');
+        var editLink = 'https://e-demo.jotform.com/edit/' + submissionId;
+
+        iframe.src = editLink;
+
+      } else {
+
+        console.error('Submission ID not found in URL parameters.');
+
+      }
+
+    }
+
+    // Call the function to load the submission edit link
+
+    loadSubmissionEditLink();
+
+  </script>
+
+  <!-- Include Jotform Emedded Form Scripts -->
+  <script src='https://e-demo.jotform.com/s/umd/latest/for-form-embed-handler.js'></script>
+  <script>window.jotformEmbedHandler("iframe[id='submissionIframe']", "https://e-demo.jotform.com/")</script>
+
+</body>
+
 </html>
