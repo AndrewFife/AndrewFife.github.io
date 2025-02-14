@@ -6,7 +6,7 @@
     <title>Iframe Embed</title>
 </head>
 <body>
-    <h1> Test File Iframe</h1>
+    <h1> Test File Iframe - v1.12</h1>
 
     <iframe id="submissionIframe" frameborder="0" style="width: 100%; height: 600px;"></iframe>
     <script>
@@ -16,7 +16,7 @@
       function getSubmissionIdFromUrl() {
   
         var urlParams = new URLSearchParams(window.location.search);
-        alert('test')
+        
   
         return urlParams.get('submissionId');
   
@@ -27,6 +27,8 @@
       function loadSubmissionEditLink() {
   
         var submissionId = getSubmissionIdFromUrl();
+
+        alert(submissionId);
   
         if (submissionId) {
   
