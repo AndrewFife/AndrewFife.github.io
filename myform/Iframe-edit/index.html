@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iframe Embed</title>
+</head>
+<body>
+    <h1> Test File Iframe</h1>
+
+    <iframe id="submissionIframe" frameborder="0" style="width: 100%; height: 600px;"></iframe>
+    <script>
+  
+      // Function to extract submission ID from URL parameters
+  
+      function getSubmissionIdFromUrl() {
+  
+        var urlParams = new URLSearchParams(window.location.search);
+  
+        return urlParams.get('submissionId');
+  
+      }
+  
+      // Function to load submission edit link dynamically
+  
+      function loadSubmissionEditLink() {
+  
+        var submissionId = getSubmissionIdFromUrl();
+  
+        if (submissionId) {
+  
+          var iframe = document.getElementById('submissionIframe');
+  
+          var editLink = 'https://venpulse.jotform.com/edit' + submissionId;
+  
+          iframe.src = editLink;
+  
+        } else {
+  
+          console.error('Submission ID not found in URL parameters.');
+  
+        }
+  
+      }
+  
+      // Call the function to load the submission edit link
+  
+      loadSubmissionEditLink();
+  
+    </script>
+    
+    </body>
+</html>
