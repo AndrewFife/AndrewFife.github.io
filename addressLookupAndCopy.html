@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Address Autocomplete Widget</title>
+  <script src="https://cdn.jotfor.ms/s/umd/latest/for-form-widgets.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 14px;
+      color: #2c3345;
+      background: transparent;
+      padding: 4px;
+    }
+
+    .widget-container {
+      width: 100%;
+      max-width: 100%;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 500;
+      color: #2c3345;
+    }
+
+    .input-wrapper {
+      position: relative;
+      width: 100%;
+    }
+
+    #address-search {
+      width: 100%;
+      padding: 10px 12px 10px 36px;
+      font-size: 14px;
+      border: 1px solid #d3d6de;
+      border-radius: 4px;
+      background-color: #fff;
+      color: #2c3345;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    #address-search:focus {
+      border-color: #0099ff;
+      box-shadow: 0 0 0 3px rgba(0, 153, 255, 0.15);
+    }
+
+    #address-search::placeholder {
+      color: #8d96ad;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 18px;
+      height: 18px;
+      color: #8d96ad;
+      pointer-events: none;
+    }
+
+    .status {
+      margin-top: 6px;
+      font-size: 12px;
+      min-height: 16px;
+    }
+
+    .status.success { color: #2dad11; }
+    .status.error   { color: #f23a3c; }
+    .status.info    { color: #6f76a7; }
+
+    /* Google Places autocomplete dropdown styling */
+    .pac-container {
+      border-radius: 4px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+      border: 1px solid #d3d6de;
+      font-family: inherit;
+      margin-top: 2px;
+      z-index: 99999;
+    }
+
+    .pac-item {
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 13px;
+      border-top: 1px solid #f3f3f3;
+    }
+
+    .pac-item:first-child { border-top: none; }
+    .pac-item:hover       { background-color: #f5f7fb; }
+
+    .pac-item-query { color: #2c3345; font-size: 13px; }
+    .pac-matched    { font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="widget-container">
+    <label for="address-search">Search for an address</label>
+    <div class="input-wrapper">
+      <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input
+        type="text"
+        id="address-search"
+        placeholder="Start typing an address..."
+        autocomplete="off"
+        spellcheck="false"
+      />
+    </div>
+    <div id="status" class="status"></div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      // ----- Configuration read from the widget settings -----
+      var GOOGLE_API_KEY     = JFCustomWidget.getWidgetSetting('googleApiKey') || '';
+      var TARGET_QID_RAW     = JFCustomWidget.getWidgetSetting('addressQuestionId') || '';
+      var COUNTRY_RESTRICT   = (JFCustomWidget.getWidgetSetting('countryRestriction') || '').trim();
+      var DEFAULT_COUNTRY    = (JFCustomWidget.getWidgetSetting('defaultCountry') || '').trim();
+
+      // Strip a leading '#' or anything non-numeric — accept e.g. "5", "#5", "input_5"
+      var TARGET_QID = (TARGET_QID_RAW.match(/\d+/) || [''])[0];
+
+      var statusEl = document.getElementById('status');
+      var inputEl  = document.getElementById('address-search');
+
+      function setStatus(msg, type) {
+        statusEl.textContent = msg || '';
+        statusEl.className = 'status' + (type ? ' ' + type : '');
+      }
+
+      function getComponent(components, type, useShort) {
+        for (var i = 0; i < components.length; i++) {
+          if (components[i].types.indexOf(type) !== -1) {
+            return useShort ? components[i].short_name : components[i].long_name;
+          }
+        }
+        return '';
+      }
+
+      // Build the address payload that a Jotform "control_address" question expects.
+      // Field keys: addr_line1, addr_line2, city, state, postal, country
+      function buildAddressFromPlace(place) {
+        var c = place.address_components || [];
+
+        var streetNumber = getComponent(c, 'street_number');
+        var route        = getComponent(c, 'route');
+        var subpremise   = getComponent(c, 'subpremise');
+
+        var line1 = (streetNumber + ' ' + route).trim();
+        if (!line1) line1 = place.name || '';
+
+        var line2 = subpremise ? ('Unit ' + subpremise) : '';
+
+        var city = getComponent(c, 'locality')
+                || getComponent(c, 'postal_town')
+                || getComponent(c, 'sublocality')
+                || getComponent(c, 'sublocality_level_1')
+                || getComponent(c, 'administrative_area_level_2');
+
+        var state   = getComponent(c, 'administrative_area_level_1', true);
+        var postal  = getComponent(c, 'postal_code');
+        var country = getComponent(c, 'country');
+
+        return {
+          addr_line1: line1,
+          addr_line2: line2,
+          city:      city,
+          state:     state,
+          postal:    postal,
+          country:   country
+        };
+      }
+
+      // Push the address into the target control_address question on the parent form
+      // using JFCustomWidget.setFieldsValueById.
+      function populateAddressField(addr) {
+        if (!TARGET_QID) {
+          setStatus('No target question ID configured.', 'error');
+          return;
+        }
+
+        try {
+          // control_address sub-fields use these keys
+          var fields = {
+            addr_line1: addr.addr_line1 || '',
+            addr_line2: addr.addr_line2 || '',
+            city:       addr.city       || '',
+            state:      addr.state      || '',
+            postal:     addr.postal     || '',
+            country:    addr.country    || DEFAULT_COUNTRY || ''
+          };
+
+          JFCustomWidget.setFieldsValueById(TARGET_QID, fields);
+
+          // Also store the formatted address as THIS widget's own value
+          var oneLine = [
+            addr.addr_line1,
+            addr.addr_line2,
+            addr.city,
+            addr.state,
+            addr.postal,
+            addr.country
+          ].filter(Boolean).join(', ');
+
+          JFCustomWidget.sendData({ value: oneLine, valid: true });
+
+          setStatus('Address populated ✓', 'success');
+        } catch (err) {
+          console.error('populateAddressField error:', err);
+          setStatus('Could not populate the address field.', 'error');
+        }
+      }
+
+      function initAutocomplete() {
+        if (!window.google || !window.google.maps || !window.google.maps.places) {
+          setStatus('Google Maps failed to load.', 'error');
+          return;
+        }
+
+        var options = {
+          types: ['address'],
+          fields: ['address_components', 'formatted_address', 'name', 'geometry']
+        };
+
+        if (COUNTRY_RESTRICT) {
+          // Accept comma-separated list, e.g. "gb,ie"
+          options.componentRestrictions = {
+            country: COUNTRY_RESTRICT.split(',').map(function (s) { return s.trim().toLowerCase(); })
+          };
+        }
+
+        var autocomplete = new google.maps.places.Autocomplete(inputEl, options);
+
+        autocomplete.addListener('place_changed', function () {
+          var place = autocomplete.getPlace();
+          if (!place || !place.address_components) {
+            setStatus('Please pick an address from the list.', 'error');
+            return;
+          }
+          var addr = buildAddressFromPlace(place);
+          populateAddressField(addr);
+        });
+
+        // Stop the form from submitting on Enter while the dropdown is open
+        inputEl.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') e.preventDefault();
+        });
+
+        setStatus('');
+      }
+
+      function loadGoogleMaps() {
+        if (!GOOGLE_API_KEY) {
+          setStatus('Google API key is missing in widget settings.', 'error');
+          inputEl.disabled = true;
+          return;
+        }
+
+        if (window.google && window.google.maps && window.google.maps.places) {
+          initAutocomplete();
+          return;
+        }
+
+        var cbName = '__jfAddrWidgetInit_' + Math.random().toString(36).slice(2, 8);
+        window[cbName] = function () { initAutocomplete(); };
+
+        var script = document.createElement('script');
+        script.src = 'https://maps.googleapis.com/maps/api/js'
+                   + '?key=' + encodeURIComponent(GOOGLE_API_KEY)
+                   + '&libraries=places'
+                   + '&loading=async'
+                   + '&callback=' + cbName;
+        script.async = true;
+        script.defer = true;
+        script.onerror = function () {
+          setStatus('Failed to load Google Maps script. Check the API key.', 'error');
+        };
+        document.head.appendChild(script);
+      }
+
+      // ----- Widget lifecycle -----
+      JFCustomWidget.subscribe('ready', function () {
+        // Re-read settings in case they were not yet available at script start
+        GOOGLE_API_KEY   = JFCustomWidget.getWidgetSetting('googleApiKey')        || GOOGLE_API_KEY;
+        TARGET_QID_RAW   = JFCustomWidget.getWidgetSetting('addressQuestionId')   || TARGET_QID_RAW;
+        COUNTRY_RESTRICT = (JFCustomWidget.getWidgetSetting('countryRestriction') || COUNTRY_RESTRICT).trim();
+        DEFAULT_COUNTRY  = (JFCustomWidget.getWidgetSetting('defaultCountry')     || DEFAULT_COUNTRY).trim();
+        TARGET_QID = (TARGET_QID_RAW.match(/\d+/) || [''])[0];
+
+        loadGoogleMaps();
+
+        // Resize iframe to fit content
+        try {
+          JFCustomWidget.requestFrameResize({ height: document.body.scrollHeight + 20 });
+        } catch (e) { /* older runtimes */ }
+      });
+
+      // When the form is submitted, return the current value of the search box
+      JFCustomWidget.subscribe('submit', function () {
+        JFCustomWidget.sendSubmit({
+          value: inputEl.value || '',
+          valid: true
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
