@@ -32,41 +32,16 @@
       color: #2c3345;
     }
 
-    .input-wrapper {
-      position: relative;
+    /* The PlaceAutocompleteElement is a Web Component — it owns its own
+       input and dropdown via shadow DOM. We can only style the host. */
+    #autocomplete-host {
       width: 100%;
+      display: block;
     }
 
-    #address-search {
+    gmp-place-autocomplete {
       width: 100%;
-      padding: 10px 12px 10px 36px;
-      font-size: 14px;
-      border: 1px solid #d3d6de;
-      border-radius: 4px;
-      background-color: #fff;
-      color: #2c3345;
-      outline: none;
-      transition: border-color 0.15s ease, box-shadow 0.15s ease;
-    }
-
-    #address-search:focus {
-      border-color: #0099ff;
-      box-shadow: 0 0 0 3px rgba(0, 153, 255, 0.15);
-    }
-
-    #address-search::placeholder {
-      color: #8d96ad;
-    }
-
-    .search-icon {
-      position: absolute;
-      left: 10px;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 18px;
-      height: 18px;
-      color: #8d96ad;
-      pointer-events: none;
+      display: block;
     }
 
     .status {
@@ -78,47 +53,12 @@
     .status.success { color: #2dad11; }
     .status.error   { color: #f23a3c; }
     .status.info    { color: #6f76a7; }
-
-    /* Google Places autocomplete dropdown styling */
-    .pac-container {
-      border-radius: 4px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-      border: 1px solid #d3d6de;
-      font-family: inherit;
-      margin-top: 2px;
-      z-index: 99999;
-    }
-
-    .pac-item {
-      padding: 8px 12px;
-      cursor: pointer;
-      font-size: 13px;
-      border-top: 1px solid #f3f3f3;
-    }
-
-    .pac-item:first-child { border-top: none; }
-    .pac-item:hover       { background-color: #f5f7fb; }
-
-    .pac-item-query { color: #2c3345; font-size: 13px; }
-    .pac-matched    { font-weight: 600; }
   </style>
 </head>
 <body>
   <div class="widget-container">
-    <label for="address-search">Search for an address</label>
-    <div class="input-wrapper">
-      <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="11" cy="11" r="8"></circle>
-        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-      </svg>
-      <input
-        type="text"
-        id="address-search"
-        placeholder="Start typing an address..."
-        autocomplete="off"
-        spellcheck="false"
-      />
-    </div>
+    <label for="autocomplete-host">Search for an address</label>
+    <div id="autocomplete-host"></div>
     <div id="status" class="status"></div>
   </div>
 
@@ -126,40 +66,41 @@
     (function () {
       'use strict';
 
-      // Settings are populated inside `ready` — see callback below.
+      // Settings populated inside `ready`
       var GOOGLE_API_KEY   = '';
       var TARGET_QID       = '';
       var COUNTRY_RESTRICT = '';
       var DEFAULT_COUNTRY  = '';
 
-      var statusEl = document.getElementById('status');
-      var inputEl  = document.getElementById('address-search');
+      var statusEl   = document.getElementById('status');
+      var hostEl     = document.getElementById('autocomplete-host');
+      var pacElement = null; // the <gmp-place-autocomplete> instance
 
       function setStatus(msg, type) {
         statusEl.textContent = msg || '';
         statusEl.className = 'status' + (type ? ' ' + type : '');
       }
 
+      // Find a component by type in the new addressComponents array.
+      // Each component has { types, longText, shortText }.
       function getComponent(components, type, useShort) {
         for (var i = 0; i < components.length; i++) {
-          if (components[i].types.indexOf(type) !== -1) {
-            return useShort ? components[i].short_name : components[i].long_name;
+          if (components[i].types && components[i].types.indexOf(type) !== -1) {
+            return useShort ? components[i].shortText : components[i].longText;
           }
         }
         return '';
       }
 
-      // Build the address payload that a Jotform "control_address" question expects.
-      // Field keys: addr_line1, addr_line2, city, state, postal, country
       function buildAddressFromPlace(place) {
-        var c = place.address_components || [];
+        var c = place.addressComponents || [];
 
         var streetNumber = getComponent(c, 'street_number');
         var route        = getComponent(c, 'route');
         var subpremise   = getComponent(c, 'subpremise');
 
         var line1 = (streetNumber + ' ' + route).trim();
-        if (!line1) line1 = place.name || '';
+        if (!line1) line1 = place.displayName || place.formattedAddress || '';
 
         var line2 = subpremise ? ('Unit ' + subpremise) : '';
 
@@ -183,7 +124,6 @@
         };
       }
 
-      // Push the address into the target control_address question on the parent form.
       function populateAddressField(addr) {
         if (!TARGET_QID) {
           setStatus('No target question ID configured.', 'error');
@@ -202,7 +142,6 @@
 
           JFCustomWidget.setFieldsValueById(TARGET_QID, fields);
 
-          // Also store the formatted address as THIS widget's own value
           var oneLine = [
             addr.addr_line1,
             addr.addr_line2,
@@ -221,77 +160,98 @@
         }
       }
 
-      function initAutocomplete() {
-        if (!window.google || !window.google.maps || !window.google.maps.places) {
-          setStatus('Google Maps failed to load.', 'error');
-          return;
-        }
+      async function initAutocomplete() {
+        try {
+          // Load the places library on demand
+          await google.maps.importLibrary('places');
 
-        var options = {
-          types: ['address'],
-          fields: ['address_components', 'formatted_address', 'name', 'geometry']
-        };
-
-        if (COUNTRY_RESTRICT) {
-          // Accept comma-separated list, e.g. "gb,ie"
-          options.componentRestrictions = {
-            country: COUNTRY_RESTRICT.split(',').map(function (s) { return s.trim().toLowerCase(); })
-          };
-        }
-
-        var autocomplete = new google.maps.places.Autocomplete(inputEl, options);
-
-        autocomplete.addListener('place_changed', function () {
-          var place = autocomplete.getPlace();
-          if (!place || !place.address_components) {
-            setStatus('Please pick an address from the list.', 'error');
-            return;
+          var options = {};
+          if (COUNTRY_RESTRICT) {
+            // New API: includedRegionCodes (array of ISO codes), max 15
+            options.includedRegionCodes = COUNTRY_RESTRICT
+              .split(',')
+              .map(function (s) { return s.trim().toLowerCase(); })
+              .filter(Boolean)
+              .slice(0, 15);
           }
-          var addr = buildAddressFromPlace(place);
-          populateAddressField(addr);
-        });
 
-        // Stop the form from submitting on Enter while the dropdown is open
-        inputEl.addEventListener('keydown', function (e) {
-          if (e.key === 'Enter') e.preventDefault();
-        });
+          pacElement = new google.maps.places.PlaceAutocompleteElement(options);
+          pacElement.id = 'address-search';
+          hostEl.appendChild(pacElement);
 
-        setStatus('');
+          pacElement.addEventListener('gmp-select', async function (ev) {
+            try {
+              var prediction = ev.placePrediction;
+              if (!prediction) {
+                setStatus('Please pick an address from the list.', 'error');
+                return;
+              }
+              var place = prediction.toPlace();
+              await place.fetchFields({
+                fields: ['addressComponents', 'formattedAddress', 'displayName']
+              });
+              var addr = buildAddressFromPlace(place);
+              populateAddressField(addr);
+            } catch (err) {
+              console.error('gmp-select handler error:', err);
+              setStatus('Could not retrieve address details.', 'error');
+            }
+          });
+
+          setStatus('');
+        } catch (err) {
+          console.error('initAutocomplete error:', err);
+          setStatus('Google Maps failed to load.', 'error');
+        }
       }
 
+      // Bootstrap loader (Google's recommended inline pattern)
+      // See: https://developers.google.com/maps/documentation/javascript/load-maps-js-api
       function loadGoogleMaps() {
         if (!GOOGLE_API_KEY) {
           setStatus('Google API key is missing in widget settings.', 'error');
-          inputEl.disabled = true;
           return;
         }
 
-        if (window.google && window.google.maps && window.google.maps.places) {
+        if (window.google && window.google.maps && window.google.maps.importLibrary) {
           initAutocomplete();
           return;
         }
 
-        var cbName = '__jfAddrWidgetInit_' + Math.random().toString(36).slice(2, 8);
-        window[cbName] = function () { initAutocomplete(); };
+        (g => {
+          var h, a, k, p = "The Google Maps JavaScript API",
+              c = "google", l = "importLibrary", q = "__ib__",
+              m = document, b = window;
+          b = b[c] || (b[c] = {});
+          var d = b.maps || (b.maps = {}),
+              r = new Set(),
+              e = new URLSearchParams(),
+              u = () => h || (h = new Promise(async (f, n) => {
+                a = m.createElement("script");
+                e.set("libraries", [...r] + "");
+                for (k in g) e.set(
+                  k.replace(/[A-Z]/g, t => "_" + t[0].toLowerCase()),
+                  g[k]
+                );
+                e.set("callback", c + ".maps." + q);
+                a.src = "https://maps." + c + "apis.com/maps/api/js?" + e;
+                d[q] = f;
+                a.onerror = () => h = n(Error(p + " could not load."));
+                a.nonce = m.querySelector("script[nonce]")?.nonce || "";
+                m.head.append(a);
+              }));
+          d[l] ? console.warn(p + " only loads once. Ignoring:", g)
+               : d[l] = (f, ...n) => r.add(f) && u().then(() => d[l](f, ...n));
+        })({
+          key: GOOGLE_API_KEY,
+          v: 'weekly'
+        });
 
-        var script = document.createElement('script');
-        script.src = 'https://maps.googleapis.com/maps/api/js'
-                   + '?key=' + encodeURIComponent(GOOGLE_API_KEY)
-                   + '&libraries=places'
-                   + '&loading=async'
-                   + '&callback=' + cbName;
-        script.async = true;
-        script.defer = true;
-        script.onerror = function () {
-          setStatus('Failed to load Google Maps script. Check the API key.', 'error');
-        };
-        document.head.appendChild(script);
+        initAutocomplete();
       }
 
-      // Always subscribe to ready event and implement widget related code
-      // inside the callback function — best practice per Jotform docs.
+      // Always subscribe to ready event — best practice per Jotform docs
       JFCustomWidget.subscribe('ready', function () {
-        // Read settings inside ready (they aren't reliably available before this)
         GOOGLE_API_KEY = JFCustomWidget.getWidgetSetting('googleApiKey') || '';
         var qidRaw     = JFCustomWidget.getWidgetSetting('addressQuestionId') || '';
         COUNTRY_RESTRICT = (JFCustomWidget.getWidgetSetting('countryRestriction') || '').trim();
@@ -302,19 +262,21 @@
 
         loadGoogleMaps();
 
-        // Resize iframe to fit content
         try {
           JFCustomWidget.requestFrameResize({ height: document.body.scrollHeight + 20 });
         } catch (e) { /* older runtimes */ }
 
         // Subscribe to form submit event
         JFCustomWidget.subscribe('submit', function () {
+          var currentValue = '';
+          try {
+            currentValue = (pacElement && pacElement.value) || '';
+          } catch (e) { currentValue = ''; }
+
           var msg = {
-            // You should send a `valid` attribute so Jotform can use the widget as required
             valid: true,
-            value: inputEl.value || ''
+            value: currentValue
           };
-          // Send value to Jotform
           JFCustomWidget.sendSubmit(msg);
         });
       });
