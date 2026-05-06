@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Address Autocomplete Widget</title>
-  <script src="https://cdn.jotfor.ms/s/umd/latest/for-form-widgets.js"></script>
+  <script src="//js.jotform.com/JotFormCustomWidget.min.js"></script>
   <style>
     * {
       box-sizing: border-box;
@@ -122,18 +122,15 @@
     <div id="status" class="status"></div>
   </div>
 
-  <script>
+  <script type="text/javascript">
     (function () {
       'use strict';
 
-      // ----- Configuration read from the widget settings -----
-      var GOOGLE_API_KEY     = JFCustomWidget.getWidgetSetting('googleApiKey') || '';
-      var TARGET_QID_RAW     = JFCustomWidget.getWidgetSetting('addressQuestionId') || '';
-      var COUNTRY_RESTRICT   = (JFCustomWidget.getWidgetSetting('countryRestriction') || '').trim();
-      var DEFAULT_COUNTRY    = (JFCustomWidget.getWidgetSetting('defaultCountry') || '').trim();
-
-      // Strip a leading '#' or anything non-numeric — accept e.g. "5", "#5", "input_5"
-      var TARGET_QID = (TARGET_QID_RAW.match(/\d+/) || [''])[0];
+      // Settings are populated inside `ready` — see callback below.
+      var GOOGLE_API_KEY   = '';
+      var TARGET_QID       = '';
+      var COUNTRY_RESTRICT = '';
+      var DEFAULT_COUNTRY  = '';
 
       var statusEl = document.getElementById('status');
       var inputEl  = document.getElementById('address-search');
@@ -186,8 +183,7 @@
         };
       }
 
-      // Push the address into the target control_address question on the parent form
-      // using JFCustomWidget.setFieldsValueById.
+      // Push the address into the target control_address question on the parent form.
       function populateAddressField(addr) {
         if (!TARGET_QID) {
           setStatus('No target question ID configured.', 'error');
@@ -195,7 +191,6 @@
         }
 
         try {
-          // control_address sub-fields use these keys
           var fields = {
             addr_line1: addr.addr_line1 || '',
             addr_line2: addr.addr_line2 || '',
@@ -293,14 +288,17 @@
         document.head.appendChild(script);
       }
 
-      // ----- Widget lifecycle -----
+      // Always subscribe to ready event and implement widget related code
+      // inside the callback function — best practice per Jotform docs.
       JFCustomWidget.subscribe('ready', function () {
-        // Re-read settings in case they were not yet available at script start
-        GOOGLE_API_KEY   = JFCustomWidget.getWidgetSetting('googleApiKey')        || GOOGLE_API_KEY;
-        TARGET_QID_RAW   = JFCustomWidget.getWidgetSetting('addressQuestionId')   || TARGET_QID_RAW;
-        COUNTRY_RESTRICT = (JFCustomWidget.getWidgetSetting('countryRestriction') || COUNTRY_RESTRICT).trim();
-        DEFAULT_COUNTRY  = (JFCustomWidget.getWidgetSetting('defaultCountry')     || DEFAULT_COUNTRY).trim();
-        TARGET_QID = (TARGET_QID_RAW.match(/\d+/) || [''])[0];
+        // Read settings inside ready (they aren't reliably available before this)
+        GOOGLE_API_KEY = JFCustomWidget.getWidgetSetting('googleApiKey') || '';
+        var qidRaw     = JFCustomWidget.getWidgetSetting('addressQuestionId') || '';
+        COUNTRY_RESTRICT = (JFCustomWidget.getWidgetSetting('countryRestriction') || '').trim();
+        DEFAULT_COUNTRY  = (JFCustomWidget.getWidgetSetting('defaultCountry')     || '').trim();
+
+        // Accept "5", "#5", or "input_5" — extract digits only
+        TARGET_QID = (qidRaw.match(/\d+/) || [''])[0];
 
         loadGoogleMaps();
 
@@ -308,13 +306,16 @@
         try {
           JFCustomWidget.requestFrameResize({ height: document.body.scrollHeight + 20 });
         } catch (e) { /* older runtimes */ }
-      });
 
-      // When the form is submitted, return the current value of the search box
-      JFCustomWidget.subscribe('submit', function () {
-        JFCustomWidget.sendSubmit({
-          value: inputEl.value || '',
-          valid: true
+        // Subscribe to form submit event
+        JFCustomWidget.subscribe('submit', function () {
+          var msg = {
+            // You should send a `valid` attribute so Jotform can use the widget as required
+            valid: true,
+            value: inputEl.value || ''
+          };
+          // Send value to Jotform
+          JFCustomWidget.sendSubmit(msg);
         });
       });
     })();
