@@ -58,6 +58,7 @@
                  }
 
                  function validatePostcode(inputValue){
+                     const ERRMSG = [ {id: "8", value: "Error"} ];
                   fetch(`https://api.postcodes.io/postcodes/${inputValue}/validate`)
                   .then((data) => {
                     var bodyJson = data.json();
@@ -67,9 +68,9 @@
                         return true
                       }
                       else{
-                        JFCustomWidget.showWidgetError("The postcode is invalid.");
+                        JFCustomWidget.showWidgetError("The postcode is" );
                         return false;
-                        JFCustomWidget.setFieldsValueById({id: '8', value: "Error"});
+                        JFCustomWidget.setFieldsValueById(ERRMSG);
                       }
                     })
                 })
